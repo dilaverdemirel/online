@@ -56,12 +56,12 @@ L.FormFieldButton = L.Layer.extend({
 
 		// Then convert to unit which can be used on the layer.
 		var buttonAreaLatLng = new L.LatLngBounds(
-				map._docLayer._twipsToLatLng(buttonAreaTwips[0], this._map.getZoom()),
-				map._docLayer._twipsToLatLng(buttonAreaTwips[1], this._map.getZoom()));
+			map._docLayer._twipsToLatLng(buttonAreaTwips[0], this._map.getZoom()),
+			map._docLayer._twipsToLatLng(buttonAreaTwips[1], this._map.getZoom()));
 
 		var buttonAreaLayer = new L.Bounds(
-				map.latLngToLayerPoint(buttonAreaLatLng.getNorthWest()),
-				map.latLngToLayerPoint(buttonAreaLatLng.getSouthEast()));
+			map.latLngToLayerPoint(buttonAreaLatLng.getNorthWest()),
+			map.latLngToLayerPoint(buttonAreaLatLng.getSouthEast()));
 
 		return buttonAreaLayer;
 	},
@@ -159,9 +159,9 @@ L.FormFieldButton = L.Layer.extend({
 		// Find item index
 		var index = $(event.target).index();
 
-		var message = 'formfieldevent {\"type\": \"drop-down\",' +
-					  '\"cmd\": \"selected\",' +
-					  '\"data\":\"' + index.toString() + '\"}';
+		var message = 'formfieldevent {"type": "drop-down",' +
+					  '"cmd": "selected",' +
+					  '"data":"' + index.toString() + '"}';
 
 		// Apply selection in the document.
 		this.map._socket.sendMessage(message);

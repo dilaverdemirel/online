@@ -1054,14 +1054,13 @@ void LOOLWSD::initialize(Application& self)
     // Setup the logfile envar for the kit processes.
     if (logToFile)
     {
-        setenv("LOOL_LOGFILE", "1", true);
         const auto it = logProperties.find("path");
         if (it != logProperties.end())
         {
+            setenv("LOOL_LOGFILE", "1", true);
             setenv("LOOL_LOGFILENAME", it->second.c_str(), true);
-#if ENABLE_DEBUG
-            std::cerr << "\nFull log is available in: " << it->second.c_str() << std::endl;
-#endif
+            std::cerr << "\nLogging at " << LogLevel << " level to file: " << it->second.c_str()
+                      << std::endl;
         }
     }
 
@@ -1069,7 +1068,8 @@ void LOOLWSD::initialize(Application& self)
     Log::initialize("wsd", "trace", withColor, logToFile, logProperties);
     if (LogLevel != "trace")
     {
-        LOG_INF("Setting log-level to [trace] and delaying setting to configured [" << LogLevel << "] until after WSD initialization.");
+        LOG_INF("Setting log-level to [trace] and delaying setting to configured ["
+                << LogLevel << "] until after WSD initialization.");
     }
 
     ServerName = config().getString("server_name");
@@ -2475,7 +2475,7 @@ private:
                     return;
                 }
 
-                response->add("Last-Modified", Poco::DateTimeFormatter::format(Poco::Timestamp(), Poco::DateTimeFormat::HTTP_FORMAT));
+                response->add("Last-Modified", Util::getHttpTimeNow());
                 // Ask UAs to block if they detect any XSS attempt
                 response->add("X-XSS-Protection", "1; mode=block");
                 // No referrer-policy
@@ -3568,11 +3568,14 @@ private:
         // Set the product name
         capabilities->set("productName", APP_NAME);
 
+        std::string version, hash;
+        Util::getVersionInfo(version, hash);
+
         // Set the product version
-        capabilities->set("productVersion", LOOLWSD_VERSION);
+        capabilities->set("productVersion", version);
 
         // Set the product version hash
-        capabilities->set("productVersionHash", LOOLWSD_VERSION_HASH);
+        capabilities->set("productVersionHash", hash);
 
         // Set that this is a proxy.php-enabled instance
         capabilities->set("hasProxyPrefix", LOOLWSD::IsProxyPrefixEnabled);

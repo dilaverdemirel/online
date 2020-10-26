@@ -434,12 +434,18 @@ void DocumentBroker::pollThread()
         // Remove idle documents after 1 hour.
         if (isLoaded() && getIdleTimeSecs() >= IdleDocTimeoutSecs)
         {
-            // Stop if there is nothing to save.
-            LOG_INF("Autosaving idle DocumentBroker for docKey [" << getDocKey() << "] to kill.");
-            if (!autoSave(isPossiblyModified()))
+            // Don't hammer on saving.
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - _lastSaveRequestTime).count()
+                >= 5)
             {
-                LOG_INF("Terminating idle DocumentBroker for docKey [" << getDocKey() << "].");
-                stop("idle");
+                // Stop if there is nothing to save.
+                LOG_INF("Autosaving idle DocumentBroker for docKey [" << getDocKey()
+                                                                      << "] to kill.");
+                if (!autoSave(isPossiblyModified()))
+                {
+                    LOG_INF("Terminating idle DocumentBroker for docKey [" << getDocKey() << "].");
+                    stop("idle");
+                }
             }
         }
 #endif
@@ -633,7 +639,10 @@ bool DocumentBroker::load(const std::shared_ptr<ClientSession>& session, const s
             LOG_DBG("Setting the session as readonly");
             session->setReadOnly();
             if (LOOLWSD::IsViewWithCommentsFileExtension(wopiStorage->getFileExtension()))
+            {
+                LOG_DBG("Allow session to change comments");
                 session->setAllowChangeComments();
+            }
         }
 
         // Construct a JSON containing relevant WOPI host properties
@@ -721,11 +730,13 @@ bool DocumentBroker::load(const std::shared_ptr<ClientSession>& session, const s
                 LOG_DBG("Setting the session as readonly");
                 session->setReadOnly();
                 if (LOOLWSD::IsViewWithCommentsFileExtension(localStorage->getFileExtension()))
+                {
+                    LOG_DBG("Allow session to change comments");
                     session->setAllowChangeComments();
+                }
             }
         }
     }
-
 
 #if ENABLE_SUPPORT_KEY
     if (!LOOLWSD::OverrideWatermark.empty())
@@ -922,21 +933,31 @@ bool DocumentBroker::attemptLock(const ClientSession& session, std::string& fail
     return bResult;
 }
 
-bool DocumentBroker::saveToStorage(const std::string& sessionId,
-                                   bool success, const std::string& result, bool force)
+bool DocumentBroker::saveToStorage(const std::string& sessionId, bool success,
+                                   const std::string& result, bool force)
 {
     assertCorrectThread();
 
     // Force saving on exit, if enabled.
-    if (!force && isMarkedToDestroy())
+    if (!force)
     {
-        static const bool always_save = LOOLWSD::getConfigValue<bool>("per_document.always_save_on_exit", false);
-        if (always_save)
+        static const bool always_save
+            = LOOLWSD::getConfigValue<bool>("per_document.always_save_on_exit", false);
+        if (isMarkedToDestroy() && always_save)
         {
             LOG_TRC("Enabling forced saving to storage per always_save_on_exit config.");
-            _storage->forceSave();
             force = true;
         }
+        else if (!_lastStorageSaveSuccessful)
+        {
+            LOG_TRC("Enabling forced saving to storage as last attempt had failed.");
+            force = true;
+        }
+    }
+
+    if (force && _storage)
+    {
+        _storage->forceSave();
     }
 
     constexpr bool isRename = false;
@@ -1031,7 +1052,7 @@ bool DocumentBroker::saveToStorageInternal(const std::string& sessionId, bool su
 
     // If the file timestamp hasn't changed, skip saving.
     const std::chrono::system_clock::time_point newFileModifiedTime = Util::getFileTimestamp(_storage->getRootFilePath());
-    if (!isSaveAs && newFileModifiedTime == _lastFileModifiedTime && !isRename)
+    if (!isSaveAs && newFileModifiedTime == _lastFileModifiedTime && !isRename && !force)
     {
         // Nothing to do.
         const auto timeInSec = std::chrono::duration_cast<std::chrono::seconds>
@@ -1448,7 +1469,7 @@ size_t DocumentBroker::removeSession(const std::string& id)
         // Last view going away, can destroy.
         _markToDestroy = (_sessions.size() <= 1);
 
-        const bool lastEditableSession = !session->isReadOnly() && !haveAnotherEditableSession(id);
+        const bool lastEditableSession = (!session->isReadOnly() || session->isAllowChangeComments()) && !haveAnotherEditableSession(id);
         static const bool dontSaveIfUnmodified = !LOOLWSD::getConfigValue<bool>("per_document.always_save_on_exit", false);
 
         LOG_INF("Removing session ["
@@ -2111,7 +2132,7 @@ bool DocumentBroker::haveAnotherEditableSession(const std::string& id) const
     {
         if (it.second->getId() != id &&
             it.second->isViewLoaded() &&
-            !it.second->isReadOnly() &&
+            (!it.second->isReadOnly() || it.second->isAllowChangeComments()) &&
             !it.second->inWaitDisconnected())
         {
             // This is a loaded session that is non-readonly.

@@ -232,31 +232,47 @@ L.TileLayer = L.GridLayer.extend({
 			selector: '.loleaflet-annotation-menu',
 			trigger: 'none',
 			className: 'loleaflet-font',
-			items: {
-				modify: {
-					name: _('Modify'),
-					callback: function (key, options) {
-						that.onAnnotationModify.call(that, options.$trigger.get(0).annotation);
-					}
-				},
-				reply: (this._docType !== 'text' && this._docType !== 'presentation') ? undefined : {
-					name: _('Reply'),
-					callback: function (key, options) {
-						that.onAnnotationReply.call(that, options.$trigger.get(0).annotation);
-					}
-				},
-				remove: {
-					name: _('Remove'),
-					callback: function (key, options) {
-						that.onAnnotationRemove.call(that, options.$trigger.get(0).annotation._data.id);
-					}
-				},
-				resolve: this._docType !== 'text' ? undefined : {
-					name: _('Resolve'),
-					callback: function (key, options) {
-						that.onAnnotationResolve.call(that, options.$trigger.get(0).annotation);
-					}
-				}
+			build: function($trigger) {
+				return {
+					items: {
+						modify: {
+							name: _('Modify'),
+							callback: function (key, options) {
+								that.onAnnotationModify.call(that, options.$trigger.get(0).annotation);
+							}
+						},
+						reply: (that._docType !== 'text' && that._docType !== 'presentation') ? undefined : {
+							name: _('Reply'),
+							callback: function (key, options) {
+								that.onAnnotationReply.call(that, options.$trigger.get(0).annotation);
+							}
+						},
+						remove: {
+							name: _('Remove'),
+							callback: function (key, options) {
+								that.onAnnotationRemove.call(that, options.$trigger.get(0).annotation._data.id);
+							}
+						},
+						removeThread: that._docType !== 'text' ? undefined : {
+							name: _('Remove Thread'),
+							callback: function (key, options) {
+								that.onAnnotationRemoveThread.call(that, options.$trigger.get(0).annotation._data.id);
+							}
+						},
+						resolve: that._docType !== 'text' ? undefined : {
+							name: $trigger.get(0).annotation._data.resolved === 'false' ? _('Resolve') : _('Unresolve'),
+							callback: function (key, options) {
+								that.onAnnotationResolve.call(that, options.$trigger.get(0).annotation);
+							}
+						},
+						resolveThread: that._docType !== 'text' ? undefined : {
+							name: that.isThreadResolved($trigger.get(0).annotation) ? _('Unresolve Thread') : _('Resolve Thread'),
+							callback: function (key, options) {
+								that.onAnnotationResolveThread.call(that, options.$trigger.get(0).annotation);
+							}
+						}
+					},
+				};
 			},
 			events: {
 				show: function (options) {
@@ -323,7 +339,7 @@ L.TileLayer = L.GridLayer.extend({
 					this._map.showWelcomeDialog();
 				}
 			},
-		this);
+			this);
 
 		map.on('updatepermission', function(e) {
 			if (e.perm !== 'edit') {
@@ -1038,7 +1054,12 @@ L.TileLayer = L.GridLayer.extend({
 			msgData = JSON.parse(textMsg.substring('jsdialog:'.length + 1));
 			if (msgData.type == 'borderwindow') {
 				window.notebookbarId = msgData.id;
-				this._map.fire('notebookbar', msgData.children[2]);
+				for (var i = 0; i < msgData.children.length; i++) {
+					if (msgData.children[i].type === 'control') {
+						this._map.fire('notebookbar', msgData.children[i]);
+						return;
+					}
+				}
 			}
 		}
 	},
@@ -1180,10 +1201,10 @@ L.TileLayer = L.GridLayer.extend({
 			var offset = new L.Point(parseInt(strTwips[2]), parseInt(strTwips[3]));
 			var bottomRightTwips = topLeftTwips.add(offset);
 			this._cellCursorTwips = this._convertToTileTwipsSheetArea(
-							new L.Bounds(topLeftTwips, bottomRightTwips));
+				new L.Bounds(topLeftTwips, bottomRightTwips));
 			this._cellCursor = new L.LatLngBounds(
-					this._twipsToLatLng(this._cellCursorTwips.getTopLeft(), this._map.getZoom()),
-					this._twipsToLatLng(this._cellCursorTwips.getBottomRight(), this._map.getZoom()));
+				this._twipsToLatLng(this._cellCursorTwips.getTopLeft(), this._map.getZoom()),
+				this._twipsToLatLng(this._cellCursorTwips.getBottomRight(), this._map.getZoom()));
 			this._cellCursorXY = new L.Point(parseInt(strTwips[4]), parseInt(strTwips[5]));
 		}
 
@@ -1261,9 +1282,9 @@ L.TileLayer = L.GridLayer.extend({
 		// # for internal links
 		if (!url.startsWith('#')) {
 			this._map.hyperlinkPopup = new L.Popup({className: 'hyperlink-popup', closeButton: false, closeOnClick: false, autoPan: false})
-			.setContent('<a id="hyperlink-pop-up">' + url + '</a>')
-			.setLatLng(position)
-			.openOn(this._map);
+				.setContent('<a id="hyperlink-pop-up">' + url + '</a>')
+				.setLatLng(position)
+				.openOn(this._map);
 			var offsetDiffTop = $('.hyperlink-popup').offset().top - $('#map').offset().top;
 			var offsetDiffLeft = $('.hyperlink-popup').offset().left - $('#map').offset().left;
 			if (offsetDiffTop < 10) this._movePopUpBelow();
@@ -1333,8 +1354,8 @@ L.TileLayer = L.GridLayer.extend({
 		var modifierViewId = parseInt(obj.viewId);
 		this._cursorAtMispelledWord = obj.mispelledWord ? Boolean(parseInt(obj.mispelledWord)).valueOf() : false;
 		this._visibleCursor = new L.LatLngBounds(
-						this._twipsToLatLng(rectangle.getTopLeft(), this._map.getZoom()),
-						this._twipsToLatLng(rectangle.getBottomRight(), this._map.getZoom()));
+			this._twipsToLatLng(rectangle.getTopLeft(), this._map.getZoom()),
+			this._twipsToLatLng(rectangle.getBottomRight(), this._map.getZoom()));
 		var cursorPos = this._visibleCursor.getNorthWest();
 		var docLayer = this._map._docLayer;
 		if ((docLayer._followEditor || docLayer._followUser) && this._map.lastActionByUser) {
@@ -1902,8 +1923,8 @@ L.TileLayer = L.GridLayer.extend({
 			var bottomRightTwips = rectangles[0].getBottomRight();
 			var oldSelection = this._textSelectionEnd;
 			this._textSelectionEnd = new L.LatLngBounds(
-						this._twipsToLatLng(topLeftTwips, this._map.getZoom()),
-						this._twipsToLatLng(bottomRightTwips, this._map.getZoom()));
+				this._twipsToLatLng(topLeftTwips, this._map.getZoom()),
+				this._twipsToLatLng(bottomRightTwips, this._map.getZoom()));
 
 			this._updateScrollOnCellSelection(oldSelection, this._textSelectionEnd);
 			this._updateMarkers();
@@ -1924,8 +1945,8 @@ L.TileLayer = L.GridLayer.extend({
 			//FIXME: on top of each other, but on separate lines. We should
 			//FIXME: capture the whole area in _onTextSelectionMsg.
 			this._textSelectionStart = new L.LatLngBounds(
-						this._twipsToLatLng(topLeftTwips, this._map.getZoom()),
-						this._twipsToLatLng(bottomRightTwips, this._map.getZoom()));
+				this._twipsToLatLng(topLeftTwips, this._map.getZoom()),
+				this._twipsToLatLng(bottomRightTwips, this._map.getZoom()));
 
 			this._updateScrollOnCellSelection(oldSelection, this._textSelectionStart);
 		}
@@ -1941,11 +1962,11 @@ L.TileLayer = L.GridLayer.extend({
 			var offset = new L.Point(parseInt(strTwips[2]), parseInt(strTwips[3]));
 			var bottomRightTwips = topLeftTwips.add(offset);
 			var boundsTwips = this._convertToTileTwipsSheetArea(
-					new L.Bounds(topLeftTwips, bottomRightTwips));
+				new L.Bounds(topLeftTwips, bottomRightTwips));
 			var oldSelection = this._cellSelectionArea;
 			this._cellSelectionArea = new L.LatLngBounds(
-					this._twipsToLatLng(boundsTwips.getTopLeft(), this._map.getZoom()),
-					this._twipsToLatLng(boundsTwips.getBottomRight(), this._map.getZoom()));
+				this._twipsToLatLng(boundsTwips.getTopLeft(), this._map.getZoom()),
+				this._twipsToLatLng(boundsTwips.getBottomRight(), this._map.getZoom()));
 
 			if (this._cellCursor === null) {
 				this._cellCursor = L.LatLngBounds.createDefault();
@@ -1963,8 +1984,8 @@ L.TileLayer = L.GridLayer.extend({
 			var offset = new L.Point(parseInt(strTwips[2]), parseInt(strTwips[3]));
 			var bottomRightTwips = topLeftTwips.add(offset);
 			this._cellAutoFillArea = new L.LatLngBounds(
-						this._twipsToLatLng(topLeftTwips, this._map.getZoom()),
-						this._twipsToLatLng(bottomRightTwips, this._map.getZoom()));
+				this._twipsToLatLng(topLeftTwips, this._map.getZoom()),
+				this._twipsToLatLng(bottomRightTwips, this._map.getZoom()));
 		} else {
 			this._cellAutoFillArea = null;
 		}
@@ -2008,7 +2029,7 @@ L.TileLayer = L.GridLayer.extend({
 			if (!tile._debugPopup) {
 				var tileBound = this._keyToBounds(key);
 				tile._debugPopup = L.popup({className: 'debug', offset: new L.Point(0, 0), autoPan: false, closeButton: false, closeOnClick: false})
-						.setLatLng(new L.LatLng(tileBound.getSouth(), tileBound.getWest() + (tileBound.getEast() - tileBound.getWest())/5));
+					.setLatLng(new L.LatLng(tileBound.getSouth(), tileBound.getWest() + (tileBound.getEast() - tileBound.getWest())/5));
 				this._debugInfo.addLayer(tile._debugPopup);
 				if (this._debugTiles[key]) {
 					this._debugInfo.removeLayer(this._debugTiles[key]);
@@ -2061,16 +2082,16 @@ L.TileLayer = L.GridLayer.extend({
 			console.log('Applying a delta of length ' + delta.length + ' pix size: ' + pixSize + '\nhex: ' + hex2string(delta));
 
 			// Green-tinge the old-Data ...
-//			for (var i = 0; i < pixSize; ++i)
-//			{
-//				oldData[i*4 + 1] = 128;
-//			}
+			// for (var i = 0; i < pixSize; ++i)
+			// {
+			// oldData[i*4 + 1] = 128;
+			// }
 
 			// wipe to grey.
-//			for (var i = 0; i < pixSize * 4; ++i)
-//			{
-//				imgData.data[i] = 128;
-//			}
+			// for (var i = 0; i < pixSize * 4; ++i)
+			// {
+			// imgData.data[i] = 128;
+			// }
 
 			// Apply delta.
 			for (var i = 1; i < delta.length;)
@@ -3448,8 +3469,8 @@ L.TileLayer = L.GridLayer.extend({
 					else {
 						// we have a custom preview
 						var bounds = new L.Bounds(
-								new L.Point(preview.tilePosX, preview.tilePosY),
-								new L.Point(preview.tilePosX + preview.tileWidth, preview.tilePosY + preview.tileHeight));
+							new L.Point(preview.tilePosX, preview.tilePosY),
+							new L.Point(preview.tilePosX + preview.tileWidth, preview.tilePosY + preview.tileHeight));
 						if (preview.invalid || (preview.part === this._selectedPart ||
 								(preview.part === this._prevSelectedPart && this._prevSelectedPartNeedsUpdate)) &&
 								invalidBounds.intersects(bounds)) {
@@ -3475,7 +3496,7 @@ L.TileLayer = L.GridLayer.extend({
 					}
 					else {
 						this._map.getCustomPreview(preview.id, preview.part, preview.width, preview.height, preview.tilePosX,
-								preview.tilePosY, preview.tileWidth, preview.tileHeight, {autoUpdate: true});
+							preview.tilePosY, preview.tileWidth, preview.tileHeight, {autoUpdate: true});
 					}
 				}
 			}
@@ -3652,7 +3673,7 @@ L.TileLayer = L.GridLayer.extend({
 		var now = +new Date();
 
 		var invalidBoundCoords = new L.LatLngBounds(this._twipsToLatLng(topLeftTwips, this._tileZoom),
-				this._twipsToLatLng(bottomRightTwips, this._tileZoom));
+			this._twipsToLatLng(bottomRightTwips, this._tileZoom));
 		var rect = L.rectangle(invalidBoundCoords, {color: 'red', weight: 1, opacity: 1, fillOpacity: 0.4, pointerEvents: 'none'});
 		this._debugInvalidBounds[this._debugId] = rect;
 		this._debugInvalidBoundsMessage[this._debugId] = command;

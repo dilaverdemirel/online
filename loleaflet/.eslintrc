@@ -17,6 +17,8 @@
     "key-spacing": 0,
     "no-shadow": 0,
     "no-console": 0,
+    "no-control-regex": 0,
+    "no-useless-escape": 0,
     "semi": 2
   },
   "globals": {

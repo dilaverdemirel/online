@@ -772,8 +772,10 @@ L.Control.LokDialog = L.Control.extend({
 	},
 
 	_launchDialog: function(id, leftTwips, topTwips, width, height, title) {
-		if (window.ThisIsTheiOSApp)
-			w2ui['editbar'].disable('closemobile');
+		if (window.ThisIsTheiOSApp) {
+			if (w2ui['editbar'])
+				w2ui['editbar'].disable('closemobile');
+		}
 		this.onCloseCurrentPopUp();
 		var dialogContainer = L.DomUtil.create('div', 'lokdialog', document.body);
 		L.DomUtil.setStyle(dialogContainer, 'padding', '0px');
@@ -1446,8 +1448,10 @@ L.Control.LokDialog = L.Control.extend({
 	_onDialogClose: function(dialogId, notifyBackend) {
 		this._closeChildWindows(dialogId);
 
-		if (window.ThisIsTheiOSApp)
-			w2ui['editbar'].enable('closemobile');
+		if (window.ThisIsTheiOSApp) {
+			if (w2ui['editbar'])
+				w2ui['editbar'].enable('closemobile');
+		}
 
 		if (notifyBackend)
 			this._sendCloseWindow(dialogId);
@@ -1620,7 +1624,7 @@ L.Control.LokDialog = L.Control.extend({
 		// set the canvas to have the actual size, while
 		// the image is rendered with the HiDPI scale.
 		this._setCanvasWidthHeight(canvas, this._dialogs[parentId].childwidth,
-						this._dialogs[parentId].childheight);
+			this._dialogs[parentId].childheight);
 
 		var ctx = canvas.getContext('2d');
 		var img = new Image();

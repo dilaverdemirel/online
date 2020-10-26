@@ -23,10 +23,12 @@ L.Cursor = L.Layer.extend({
 		if (!this._container) {
 			this._initLayout();
 		}
-		if (this._map._docLayer._docType === 'presentation') {
-			$('.leaflet-interactive').css('cursor', 'text');
-		} else {
-			$('.leaflet-pane.leaflet-map-pane').css('cursor', 'text');
+		if (this._container.querySelector('.blinking-cursor') !== null) {
+			if (this._map._docLayer._docType === 'presentation') {
+				$('.leaflet-interactive').css('cursor', 'text');
+			} else {
+				$('.leaflet-pane.leaflet-map-pane').css('cursor', 'text');
+			}
 		}
 		this._zoomAnimated = this._zoomAnimated && this.options.zoomAnimation;
 		if (this._zoomAnimated) {
@@ -170,7 +172,7 @@ L.Cursor.getCustomCursor = function (cursorName) {
 	if (L.Cursor.isCustomCursor(cursorName)) {
 		var cursorHotSpot = L.Cursor.hotSpot[cursorName] || {x: 0, y: 0};
 		customCursor = L.Browser.ie ? // IE10 does not like item with left/top position in the url list
-		'url(' + L.Cursor.imagePath + '/' + cursorName + '.cur), default' :
+			'url(' + L.Cursor.imagePath + '/' + cursorName + '.cur), default' :
 			'url(' + L.Cursor.imagePath + '/' + cursorName + '.png) ' + cursorHotSpot.x + ' ' + cursorHotSpot.y + ', default';
 	}
 	return customCursor;

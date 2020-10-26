@@ -572,7 +572,7 @@ $(DIST_FOLDER)/l10n/%: $(srcdir)/l10n/%
 	@cp $< $@
 
 $(DIST_FOLDER)/l10n/%.json: $(srcdir)/po/%.po
-	@$(srcdir)/util/po2json.py $< -o $@
+	@$(srcdir)/util/po2json.py --quiet $< -o $@
 
 $(DIST_FOLDER)/admin/%: $(srcdir)/admin/%
 	@mkdir -p $(dir $@)
@@ -624,6 +624,7 @@ pot:
 		src/control/Control.NotebookbarCalc.js \
 		src/control/Control.NotebookbarImpress.js \
 		src/control/Control.NotebookbarBuilder.js \
+		src/control/Parts.js \
 		src/control/Permission.js \
 		src/control/Ruler.js \
 		src/control/Signing.js \

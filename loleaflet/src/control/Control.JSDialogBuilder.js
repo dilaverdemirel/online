@@ -218,7 +218,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			else if (data.text) {
 				builder._unoToolButton(parentContainer, data, builder);
 			} else
-				console.warn('Unsupported toolitem type: \"' + data.command + '\"');
+				console.warn('Unsupported toolitem type: "' + data.command + '"');
 		}
 
 		return false;
@@ -237,13 +237,13 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		} else if (object) {
 			data = typeof data === 'string' ? data.replace('"', '\\"') : data;
 			var windowId = window.mobileDialogId !== undefined ? window.mobileDialogId :
-								(window.notebookbarId !== undefined ? window.notebookbarId :
-								(window.sidebarId !== undefined ? window.sidebarId : -1));
+				(window.notebookbarId !== undefined ? window.notebookbarId :
+					(window.sidebarId !== undefined ? window.sidebarId : -1));
 			var message = 'dialogevent ' + windowId
-					+ ' {\"id\":\"' + object.id
-				+ '\", \"cmd\": \"' + eventType
-				+ '\", \"data\": \"' + data
-				+ '\", \"type\": \"' + objectType + '\"}';
+					+ ' {"id":"' + object.id
+				+ '", "cmd": "' + eventType
+				+ '", "data": "' + data
+				+ '", "type": "' + objectType + '"}';
 			builder.map._socket.sendMessage(message);
 		}
 	},
@@ -890,7 +890,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 
 	_unitToVisibleString: function(unit) {
 		if (unit == 'inch') {
-			return '\"';
+			return '"';
 		} else if (unit == 'percent') {
 			return '%';
 		} else if (unit == 'degree') {
@@ -1590,7 +1590,8 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			image.id = data.id;
 			image.alt = data.text;
 			image.title = data.text;
-			$(image).tooltip();
+			if (!window.ThisIsAMobileApp)
+				$(image).tooltip();
 
 			if (data.loading && data.loading === 'true') {
 				var loaderContainer = L.DomUtil.create('div', 'ui-drawing-area-loader-container', container);
@@ -1678,7 +1679,8 @@ L.Control.JSDialogBuilder = L.Control.extend({
 				$(div).addClass('has-label');
 			} else {
 				div.title = data.text;
-				$(div).tooltip();
+				if (!window.ThisIsAMobileApp)
+					$(div).tooltip();
 				$(div).addClass('no-label');
 			}
 
@@ -1889,6 +1891,10 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			icon.alt = '';
 			titleClass = 'menu-entry-with-icon';
 		}
+
+		sectionTitle.title = data.text;
+		if (!window.ThisIsAMobileApp)
+			$(sectionTitle).tooltip();
 
 		var updateFunction = function() {
 			var items = builder.map['stateChangeHandler'];
@@ -2329,7 +2335,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 				if (handler)
 					processChildren = handler(childObject, childData, this);
 				else
-					console.warn('Unsupported control type: \"' + childType + '\"');
+					console.warn('JSDialogBuilder: Unsupported control type: "' + childType + '"');
 
 				if (processChildren && childData.children != undefined)
 					this.build(childObject, childData.children);

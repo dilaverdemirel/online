@@ -75,8 +75,8 @@ bool unmount(const std::string& target)
 // kit could have had it removed when falling back to copying.
 // In such cases, we cannot safely know whether the jail was
 // copied or not, since the bind envar will be present and
-// assuming it was mounted would leak them.
-// Alternatively, we if remove the files when mounted
+// assuming it was mounted, would leak them.
+// Alternatively, if we remove the files when mounted
 // we could destroy systemplate if remounting read-only had
 // failed (and it wasn't owned by root).
 constexpr const char* COPIED_JAIL_MARKER_FILE = "delete.me";
@@ -187,6 +187,8 @@ void setupJails(bool bindMount, const std::string& jailRoot, const std::string& 
     Poco::File(jailRoot).createDirectories();
 
     disableBindMounting(); // Clear to avoid surprises.
+
+    // Try to enable bind-mounting if requested (via config).
     if (bindMount)
     {
         // Test mounting to verify it actually works,
@@ -213,8 +215,26 @@ void setupJails(bool bindMount, const std::string& jailRoot, const std::string& 
 // /tmp/dev/ in the jail chroot. See setupRandomDeviceLinks().
 void setupJailDevNodes(const std::string& root)
 {
-    // Create the urandom and random devices
-    Poco::File(Poco::Path(root, "/dev")).createDirectory();
+    if (!FileUtil::isWritable(root))
+    {
+        LOG_WRN("Path [" << root << "] is read-only. Will not create the random device nodes.");
+        return;
+    }
+
+    const auto pathDev = Poco::Path(root, "/dev");
+
+    try
+    {
+        // Create the path first.
+        Poco::File(pathDev).createDirectory();
+    }
+    catch (const std::exception& ex)
+    {
+        LOG_WRN("Failed to create [" << pathDev.toString() << "]: " << ex.what());
+        return;
+    }
+
+    // Create the urandom and random devices.
     if (!Poco::File(root + "/dev/random").exists())
     {
         LOG_DBG("Making /dev/random node in [" << root << "/dev].");
@@ -294,6 +314,13 @@ void setupDynamicFiles(const std::string& sysTemplate)
         LinkDynamicFiles = false;
     }
 
+    FileUtil::Stat copiedFileStat(Poco::Path(sysTemplate, "etc/copied").toString());
+    if (copiedFileStat.exists())
+    {
+        // At least one file is copied, we must check for changes before each jail setup.
+        LinkDynamicFiles = false;
+    }
+
     LOG_INF("Systemplate dynamic files in ["
             << sysTemplate << "] "
             << (LinkDynamicFiles ? "are linked and will remain" : "will be copied to keep them")
@@ -303,14 +330,21 @@ void setupDynamicFiles(const std::string& sysTemplate)
 bool updateDynamicFilesImpl(const std::string& sysTemplate)
 {
     LOG_INF("Updating systemplate dynamic files in [" << sysTemplate << "].");
-    for (const auto& srcFilename : DynamicFilePaths)
+    for (const auto& dynFilename : DynamicFilePaths)
     {
+        const std::string srcFilename = FileUtil::realpath(dynFilename);
+        if (srcFilename != dynFilename)
+        {
+            LOG_DBG("Dynamic file [" << dynFilename << "] points to real path [" << srcFilename
+                                     << "], which will be used instead.");
+        }
+
         const Poco::File srcFilePath(srcFilename);
         FileUtil::Stat srcStat(srcFilename);
         if (!srcStat.exists())
             continue;
 
-        const std::string dstFilename = Poco::Path(sysTemplate, srcFilename).toString();
+        const std::string dstFilename = Poco::Path(sysTemplate, dynFilename).toString();
         FileUtil::Stat dstStat(dstFilename);
 
         // Is it outdated?
@@ -320,17 +354,30 @@ bool updateDynamicFilesImpl(const std::string& sysTemplate)
             continue;
         }
 
+        // Check that sysTemplate is in fact writable to avoid predictable errors.
+        if (!FileUtil::isWritable(sysTemplate))
+        {
+            disableBindMounting(); // We can't mount from incomplete systemplate that can't be updated.
+            LinkDynamicFiles = false;
+            LOG_INF("The systemplate directory ["
+                    << sysTemplate << "] is read-only, and at least [" << dstFilename
+                    << "] is out-of-date. Will have to copy sysTemplate to jails. To restore "
+                       "optimal performance, make sure the files in ["
+                    << sysTemplate << "/etc] are up-to-date.");
+            return false;
+        }
+
         LOG_INF("File [" << dstFilename << "] needs to be updated.");
         if (LinkDynamicFiles)
         {
             LOG_INF("Linking [" << srcFilename << "] -> [" << dstFilename << "].");
 
             // Link or copy.
-            if (link(srcFilename, dstFilename.c_str()) == 0)
+            if (link(srcFilename.c_str(), dstFilename.c_str()) == 0)
                 continue;
 
             // Hard-linking failed, try symbolic linking.
-            if (symlink(srcFilename, dstFilename.c_str()) == 0)
+            if (symlink(srcFilename.c_str(), dstFilename.c_str()) == 0)
                 continue;
 
             const int linkerr = errno;
@@ -362,6 +409,9 @@ bool updateDynamicFilesImpl(const std::string& sysTemplate)
                     return false; // No point in trying the remaining files.
                 }
             }
+
+            // Create the 'copied' file so we keep the files up-to-date.
+            Poco::File(Poco::Path(sysTemplate, "etc/copied").toString()).createFile();
         }
     }
 
@@ -377,7 +427,16 @@ bool updateDynamicFiles(const std::string& sysTemplate)
 void setupRandomDeviceLink(const std::string& sysTemplate, const std::string& name)
 {
     const std::string path = sysTemplate + "/dev/";
-    Poco::File(path).createDirectories();
+    try
+    {
+        // Create the path first.
+        Poco::File(path).createDirectories();
+    }
+    catch (const std::exception& ex)
+    {
+        LOG_WRN("Failed to create [" << path << "]: " << ex.what());
+        return;
+    }
 
     const std::string linkpath = path + name;
     const std::string target = "../tmp/dev/" + name;

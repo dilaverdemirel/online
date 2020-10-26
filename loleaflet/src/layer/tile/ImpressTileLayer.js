@@ -3,7 +3,7 @@
  * Impress tile layer is used to display a presentation document
  */
 
-/* global $ L */
+/* global $ L isAnyVexDialogActive */
 
 L.ImpressTileLayer = L.CanvasTileLayer.extend({
 
@@ -117,6 +117,8 @@ L.ImpressTileLayer = L.CanvasTileLayer.extend({
 	},
 
 	onUpdateParts: function () {
+		if (isAnyVexDialogActive()) // Need this check else vex loses focus
+			return;
 		if (typeof this._prevSelectedPart === 'number') {
 			this._annotationManager.onPartChange(this._prevSelectedPart);
 		}
@@ -239,11 +241,11 @@ L.ImpressTileLayer = L.CanvasTileLayer.extend({
 			}
 			var scale = this._map.getZoomScale(coords.z);
 			topLeftTwips = new L.Point(
-					this.options.tileWidthTwips / scale * coords.x,
-					this.options.tileHeightTwips / scale * coords.y);
+				this.options.tileWidthTwips / scale * coords.x,
+				this.options.tileHeightTwips / scale * coords.y);
 			bottomRightTwips = topLeftTwips.add(new L.Point(
-					this.options.tileWidthTwips / scale,
-					this.options.tileHeightTwips / scale));
+				this.options.tileWidthTwips / scale,
+				this.options.tileHeightTwips / scale));
 			bounds = new L.Bounds(topLeftTwips, bottomRightTwips);
 			if (invalidBounds.intersects(bounds)) {
 				delete this._tileCache[key];

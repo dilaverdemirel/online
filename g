@@ -16,6 +16,11 @@ if [ "$1" == "review" ]; then
         exit 1
     fi
 
+    if ! gh auth status &>/dev/null; then
+        echo "'gh' thinks you are not logged into any GitHub hosts. Run 'gh auth login' to authenticate."
+        exit 1
+    fi
+
     # e.g. co-4-2
     BRANCH=$(git symbolic-ref HEAD|sed 's|refs/heads/||')
     # e.g. origin
@@ -28,6 +33,10 @@ if [ "$1" == "review" ]; then
         REMOTE_BRANCH=private/$USER/$2
         CUSTOM_BRANCH=y
     fi
+
+    # So that we have an up to date view on what remote branches exist.
+    git fetch --prune $REMOTE
+
     HAS_REMOTE_BRANCH=
     if git rev-parse --quiet --verify $REMOTE/$REMOTE_BRANCH >/dev/null; then
         HAS_REMOTE_BRANCH=y

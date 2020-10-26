@@ -22,6 +22,7 @@ L.AnnotationManagerImpress = L.AnnotationManagerBase.extend({
 		this._map.on('AnnotationSave', this.onAnnotationSave, this);
 		this._map.on('AnnotationScrollUp', this.onAnnotationScrollUp, this);
 		this._map.on('AnnotationScrollDown', this.onAnnotationScrollDown, this);
+		this._map.on('AnnotationReply', this.onReplyClick, this);
 
 		this._annotations = {};
 		this._topAnnotation = [];
@@ -137,6 +138,21 @@ L.AnnotationManagerImpress = L.AnnotationManagerBase.extend({
 			annotation.focus();
 		}
 	},
+	onReplyClick: function (e) {
+		var comment = {
+			Id: {
+				type: 'string',
+				value: e.annotation._data.id
+			},
+			Text: {
+				type: 'string',
+				value: e.annotation._data.reply
+			}
+		};
+		this._map.sendUnoCommand('.uno:ReplyToAnnotation', comment);
+		this._selectedAnnotation = undefined;
+		this._map.focus();
+	},
 	onAnnotationRemove: function (id) {
 		this.onAnnotationCancel();
 		var comment = {
@@ -150,7 +166,6 @@ L.AnnotationManagerImpress = L.AnnotationManagerBase.extend({
 	},
 	onAnnotationClick: function (event) {
 		this._selectedForPopup = event.annotation;
-		this._map.focus();
 		this.layoutAnnotations();
 	},
 	onAnnotationSave: function (event) {
@@ -181,20 +196,67 @@ L.AnnotationManagerImpress = L.AnnotationManagerBase.extend({
 		}
 		this._map.focus();
 	},
+	countDocumentAnnotations: function () {
+		var count = 0;
+		if (this._annotations) {
+			for (var part in this._annotations) {
+				count = count + this._annotations[part].length;
+			}
+		}
+		return count;
+	},
+	findNextPartWithComment: function () {
+		var part = this.getSelectedPart() + 1;
+
+		while (part < this._map._docLayer._parts) {
+			var annotations = this._annotations[this.getPartHash(part)];
+			if (annotations && annotations.length)
+				return part;
+
+			part = part + 1;
+		}
+
+		return null;
+	},
+	findPreviousPartWithComment: function () {
+		var part = this.getSelectedPart() - 1;
+
+		while (part >= 0) {
+			var annotations = this._annotations[this.getPartHash(part)];
+			if (annotations && annotations.length)
+				return part;
+
+			part = part - 1;
+		}
+
+		return null;
+	},
 	onAnnotationScrollDown: function () {
 		var part = this.getSelectedPart();
-		this._topAnnotation[part] = Math.min(this._topAnnotation[part] + 1, this._annotations[this.getPartHash(part)].length - 1);
-		var topRight = this._map.latLngToLayerPoint(this._map.options.docBounds.getNorthEast());
-		this._map.fire('scrollby', {x: topRight.x, y: 0});
-		this.onAnnotationCancel();
+		var annotations = this._annotations[this.getPartHash(part)];
+		var commentsOnThePage = annotations ? annotations.length - 1 : 0;
+
+		if (commentsOnThePage >= this._topAnnotation[part] + 1) {
+			this._topAnnotation[part] = this._topAnnotation[part] + 1;
+			var topRight = this._map.latLngToLayerPoint(this._map.options.docBounds.getNorthEast());
+			this._map.fire('scrollby', {x: topRight.x, y: 0});
+			this.onAnnotationCancel();
+		} else if (part + 1 < this._map._docLayer._parts) {
+			var newPart = this.findNextPartWithComment();
+			if (newPart)
+				this._map.setPart(newPart);
+		}
 	},
 	onAnnotationScrollUp: function () {
 		var part = this.getSelectedPart();
-		if (this._topAnnotation[part] === 0) {
-			this._map.fire('scrollby', {x: 0, y: -100});
+		if (!this._topAnnotation[part] || this._topAnnotation[part] === 0) {
+			var newPart = this.findPreviousPartWithComment();
+			if (newPart != null)
+				this._map.setPart(newPart);
+		} else {
+			this._topAnnotation[part] = Math.max(--this._topAnnotation[part], 0);
+			this.onAnnotationCancel();
 		}
-		this._topAnnotation[part] = Math.max(--this._topAnnotation[part], 0);
-		this.onAnnotationCancel();
 	},
 	onPartChange: function (previous) {
 		var part = this.getSelectedPart();
@@ -333,8 +395,10 @@ L.AnnotationManagerImpress = L.AnnotationManagerBase.extend({
 					topLeft = bounds ? bounds.getBottomLeft() : topRight;
 					annotation.setLatLng(this._map.layerPointToLatLng(topLeft));
 					annotation.show();
-					bounds = annotation.getBounds();
-					bounds.extend(L.point(bounds.max.x, bounds.max.y + this.options.marginY));
+					if (this.countDocumentAnnotations() > 1) {
+						bounds = annotation.getBounds();
+						bounds.extend(L.point(bounds.max.x, bounds.max.y + this.options.marginY));
+					}
 				}
 			} else {
 				annotation.hide();

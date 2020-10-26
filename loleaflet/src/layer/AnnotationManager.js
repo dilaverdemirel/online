@@ -657,6 +657,16 @@ L.AnnotationManager = L.AnnotationManagerBase.extend({
 		this._map.sendUnoCommand('.uno:ResolveComment', comment);
 	},
 
+	resolveThread: function (annotation) {
+		var comment = {
+			Id: {
+				type: 'string',
+				value: annotation._data.id
+			}
+		};
+		this._map.sendUnoCommand('.uno:ResolveCommentThread', comment);
+	},
+
 	updateResolvedState: function (annotation) {
 		var threadIndexFirst = this.getRootIndexOf(annotation._data.id);
 		if (this._items[threadIndexFirst]._data.resolved !== annotation._data.resolved) {
@@ -699,6 +709,18 @@ L.AnnotationManager = L.AnnotationManagerBase.extend({
 		this._map.focus();
 	},
 
+	removeThread: function (id) {
+		var comment = {
+			Id: {
+				type: 'string',
+				value: id
+			}
+		};
+		this._map.sendUnoCommand('.uno:DeleteCommentThread', comment);
+		this.unselect();
+		this._map.focus();
+	},
+
 	_onRedlineAccept: function(e) {
 		var command = {
 			AcceptTrackedChange: {
@@ -721,6 +743,19 @@ L.AnnotationManager = L.AnnotationManagerBase.extend({
 		this._map.sendUnoCommand('.uno:RejectTrackedChange', command);
 		this.unselect();
 		this._map.focus();
+	},
+
+	_isThreadResolved: function(annotation) {
+		var lastChild = this.getLastChildIndexOf(annotation._data.id);
+
+		while (this._items[lastChild]._data.parent !== '0') {
+			if (this._items[lastChild]._data.resolved === 'false')
+				return false;
+			lastChild = this.getIndexOf(this._items[lastChild]._data.parent);
+		}
+		if (this._items[lastChild]._data.resolved === 'false')
+			return false;
+		return true;
 	},
 
 	// Adjust parent-child relationship, if required, after `comment` is added

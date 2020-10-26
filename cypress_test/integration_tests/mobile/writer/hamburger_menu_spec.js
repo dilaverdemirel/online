@@ -515,7 +515,7 @@ describe('Trigger hamburger menu options.', function() {
 		// We use the cursor horizontal position as indicator of document width change.
 		helper.moveCursor('end');
 
-		writerMobileHelper.getCursorPos('left', 'cursorOrigLeft');
+		helper.getCursorPos('left', 'cursorOrigLeft');
 
 		openPageWizard();
 
@@ -547,7 +547,7 @@ describe('Trigger hamburger menu options.', function() {
 		// We use the cursor horizontal position as indicator of document width change.
 		helper.moveCursor('end');
 
-		writerMobileHelper.getCursorPos('left', 'cursorOrigLeft');
+		helper.getCursorPos('left', 'cursorOrigLeft');
 
 		openPageWizard();
 
@@ -580,7 +580,7 @@ describe('Trigger hamburger menu options.', function() {
 		// We use the cursor vertical position as indicator of document size change.
 		helper.moveCursor('ctrl-end');
 
-		writerMobileHelper.getCursorPos('top', 'cursorOrigTop');
+		helper.getCursorPos('top', 'cursorOrigTop');
 
 		openPageWizard();
 
@@ -611,7 +611,7 @@ describe('Trigger hamburger menu options.', function() {
 		// We use the cursor horizontal position as indicator of document width change.
 		helper.moveCursor('end');
 
-		writerMobileHelper.getCursorPos('left', 'cursorOrigLeft');
+		helper.getCursorPos('left', 'cursorOrigLeft');
 
 		openPageWizard();
 
@@ -648,7 +648,7 @@ describe('Trigger hamburger menu options.', function() {
 		cy.get('.blinking-cursor')
 			.should('be.visible');
 
-		writerMobileHelper.getCursorPos('left', 'cursorOrigLeft');
+		helper.getCursorPos('left', 'cursorOrigLeft');
 
 		openPageWizard();
 
@@ -731,11 +731,7 @@ describe('Trigger hamburger menu options.', function() {
 			.should('not.contain', 'visibility: hidden');
 
 		// Resolve comment
-		cy.get('.loleaflet-annotation-menu')
-			.click({force: true});
-
-		cy.contains('.context-menu-link', 'Resolve')
-			.click();
+		mobileHelper.selectAnnotationMenuItem('Resolve');
 
 		cy.get('.loleaflet-annotation:nth-of-type(2)')
 			.should('have.attr', 'style')
